@@ -135,12 +135,12 @@ class Analyzer:
 
                 total_score = 1 * total_pts \
                               + 1.25 * total_reb \
-                              + 1.5 * total_ast + \
-                              3 * total_stl + \
-                              3 * total_blk + \
-                              1 * total_fg3m - \
-                              1 * total_tov - \
-                              0.5 * (total_fgmiss + total_ftmiss) \
+                              + 1.5 * total_ast \
+                              + 3 * total_stl \
+                              + 3 * total_blk \
+                              + 1 * total_fg3m \
+                              - 1 * total_tov \
+                              - 0.5 * (total_fgmiss + total_ftmiss) \
                               + 5 * (double_double - triple_double) \
                               + 20 * triple_double
                 avg_score = total_score / game_played
