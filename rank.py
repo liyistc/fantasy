@@ -35,8 +35,31 @@ def analyse(season, cache):
         if game_played > 0:
             game_win = len(stats[stats.WL == 'W'].index)
             game_lose = len(stats[stats.WL == 'L'].index)
-            double_double = len(stats[((stats.AST >= 10) & (stats.PTS >= 10)) | ((stats.AST >= 10) & (stats.REB >= 10)) | ((stats.PTS >= 10) & (stats.REB >= 10))].index)
-            triple_double = len(stats[((stats.AST >= 10) & (stats.PTS >= 10)) & (stats.REB >= 10)].index)
+            double_double = len(stats[ \
+                                       ((stats.AST >= 10) & (stats.PTS >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.REB >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.BLK >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.PTS >= 10) & (stats.REB >= 10)) | \
+                                       ((stats.PTS >= 10) & (stats.BLK >= 10)) | \
+                                       ((stats.PTS >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.REB >= 10) & (stats.BLK >= 10)) | \
+                                       ((stats.REB >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.BLK >= 10) & (stats.STL >= 10)) \
+                                   ].index)
+            triple_double = len(stats[ \
+                                       ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.REB >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.BLK >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.REB >= 10) & (stats.BLK >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.REB >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.AST >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.PTS >= 10) & (stats.REB >= 10) & (stats.BLK >= 10)) | \
+                                       ((stats.PTS >= 10) & (stats.REB >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.PTS >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) | \
+                                       ((stats.REB >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) \
+                                     ].index)
+                                
             sum = stats.sum()
             total_pts = sum['PTS']
             total_ast = sum['AST']
@@ -52,7 +75,7 @@ def analyse(season, cache):
             total_stl = sum['STL']
             total_tov = sum['TOV']
 
-            total_score = 1 * total_pts + 1.25 * total_reb + 1.5 * total_ast + 3 * total_stl + 3 * total_blk + 1 * total_fg3m - 1 * total_tov - 0.5 * (total_fgmiss + total_ftmiss) + 5 * (double_double - triple_double) + 20 * triple_double
+            total_score = 1 * total_pts + 1.25 * total_reb + 1.5 * total_ast + 3 * total_stl + 3 * total_blk + 1 * total_fg3m - 1 * total_tov - 0.5 * (total_fgmiss + total_ftmiss) + 5 * (double_double - triple_double) + 20 * triple_double + 0.5 * game_win
             avg_score = total_score / game_played
         else:
             avg_score = 0.0
@@ -74,7 +97,7 @@ def main():
     
     season = args.season
     show = int(args.display)
-    cache = "cache"
+    cache = ".cache"
     
     for s in season:
         if s < 2000 or s > 2015:
