@@ -12,94 +12,155 @@ from progressbar import ProgressBar, Bar, ETA, Percentage, RotatingMarker
 import os
 import argparse
 
-def analyse(season, cache):
-    ranking = pd.DataFrame(columns=('name','score'))
 
-    players = pd.DataFrame(PlayerList(season))
-    widgets = ['Analyzing: ', Percentage(), ' ', Bar(marker=RotatingMarker()), ' ', ETA()]
-    pbar = ProgressBar(widgets=widgets, maxval=len(players.index)).start()
-    
-    for index, row in players.iterrows():
-        name = row['DISPLAY_LAST_COMMA_FIRST']
-        person = row['PERSON_ID']
+class Analyzer:
+
+    def __init__(self, cache, default_season):
+        self.cache = cache
+        self.default_cache = os.path.join(cache, default_season)
+        self.default_season = default_season
+        if not os.path.exists(self.default_cache):
+            os.makedirs(self.default_cache)
+
+    def merge_table_on_id_name(self, table_list, seasons, column):
+        i = 0
+        merge = table_list[i][['id','name',column]]
+        # rename column avg to avg_<season>
+        merge = merge.rename(columns = {column : column+'_'+str(seasons[i])})
         
-        playerlog = str(person) + '.csv'
-        player_cache = os.path.join(cache, playerlog)
-        if not os.path.exists(player_cache):
-            stats = pd.DataFrame(game_logs(playerid=person, season=season).logs())
-            stats.to_csv(player_cache)
-        else:
-            stats = pd.DataFrame.from_csv(player_cache)
+        for r in table_list[1:]:
+            i = i + 1
+            margin = r[['id','name',column]].rename(columns = {column : column+'_'+str(seasons[i])})
+            merge = pd.merge(merge, margin, \
+                             on=['id','name'])
+        return merge
 
-        game_played = len(stats.index)
-        if game_played > 0:
-            game_win = len(stats[stats.WL == 'W'].index)
-            game_lose = len(stats[stats.WL == 'L'].index)
-            double_double = len(stats[ \
-                                       ((stats.AST >= 10) & (stats.PTS >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.REB >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.BLK >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.PTS >= 10) & (stats.REB >= 10)) | \
-                                       ((stats.PTS >= 10) & (stats.BLK >= 10)) | \
-                                       ((stats.PTS >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.REB >= 10) & (stats.BLK >= 10)) | \
-                                       ((stats.REB >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.BLK >= 10) & (stats.STL >= 10)) \
-                                   ].index)
-            triple_double = len(stats[ \
-                                       ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.REB >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.BLK >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.REB >= 10) & (stats.BLK >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.REB >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.AST >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.PTS >= 10) & (stats.REB >= 10) & (stats.BLK >= 10)) | \
-                                       ((stats.PTS >= 10) & (stats.REB >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.PTS >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) | \
-                                       ((stats.REB >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) \
-                                     ].index)
+    def analyse(self, seasons):
+        rank_list = []
+        merged_ranking = dict()
+
+        for s in seasons:
+            if s < 2000 or s > 2015:
+                print 'Invalid season!'
+                exit(1)
+            
+            print 'Analyzing season ', s
+            s = str(s)
+            season_cache = os.path.join(self.cache, s)
+            
+            # we only care about players appeared in the latest rosters
+            players_cache = os.path.join(self.default_cache, 'players.csv')
+            if not os.path.exists(season_cache):
+                os.makedirs(season_cache)
+
+            if not os.path.exists(players_cache):
+                p_2015 = pd.DataFrame(PlayerList(self.default_season))
+                p_2015.to_csv(players_cache)
+            else:
+                p_2015 = pd.DataFrame.from_csv(players_cache)
+
+            season_ranking = self.analyse_season(players=p_2015, season=s, cache=season_cache)
+            rank_list.append(season_ranking)
+
+        merged_ranking['avg'] = self.merge_table_on_id_name(rank_list, seasons, 'avg')
+        merged_ranking['total'] = self.merge_table_on_id_name(rank_list, seasons, 'total')
+        merged_ranking['games'] = self.merge_table_on_id_name(rank_list, seasons, 'games')
+
+        return merged_ranking
+        
+
+
+    def analyse_season(self, players, season, cache):
+        ranking = pd.DataFrame(columns=('id', 'name','total','games','avg'))
+
+        widgets = ['Analyzing: ', Percentage(), ' ', Bar(marker=RotatingMarker()), ' ', ETA()]
+        pbar = ProgressBar(widgets=widgets, maxval=len(players.index)).start()
+    
+        for index, row in players.iterrows():
+            name = row['DISPLAY_LAST_COMMA_FIRST']
+            person = row['PERSON_ID']        
+            playerlog = str(person) + '.csv'
+            player_cache = os.path.join(cache, playerlog)
+
+            if not os.path.exists(player_cache):
+                stats = pd.DataFrame(game_logs(playerid=person, season=season).logs())
+                stats.to_csv(player_cache)
+            else:
+                stats = pd.DataFrame.from_csv(player_cache)
+
+            game_played = len(stats.index)
+            # if the played any game in the season
+            if game_played > 0:
+                game_win = len(stats[stats.WL == 'W'].index)
+                game_lose = len(stats[stats.WL == 'L'].index)
+                double_double = len(stats[ \
+                                           ((stats.AST >= 10) & (stats.PTS >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.REB >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.BLK >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.PTS >= 10) & (stats.REB >= 10)) | \
+                                           ((stats.PTS >= 10) & (stats.BLK >= 10)) | \
+                                           ((stats.PTS >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.REB >= 10) & (stats.BLK >= 10)) | \
+                                           ((stats.REB >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.BLK >= 10) & (stats.STL >= 10)) \
+                                       ].index)
+                triple_double = len(stats[ \
+                                           ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.REB >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.BLK >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.PTS >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.REB >= 10) & (stats.BLK >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.REB >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.AST >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.PTS >= 10) & (stats.REB >= 10) & (stats.BLK >= 10)) | \
+                                           ((stats.PTS >= 10) & (stats.REB >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.PTS >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) | \
+                                           ((stats.REB >= 10) & (stats.BLK >= 10) & (stats.STL >= 10)) \
+                                       ].index)
                                 
-            sum = stats.sum()
-            total_pts = sum['PTS']
-            total_ast = sum['AST']
-            total_blk = sum['BLK']
-            total_fgm = sum['FGM']
-            total_fgmiss = sum['FGA'] - sum['FGM']
-            total_fg3m = sum['FG3M']
-            total_fg3miss = sum['FG3A'] - sum['FG3M']
-            total_reb = sum['REB']
-            total_pf = sum['PF']
-            total_ftm = sum['FTM']
-            total_ftmiss = sum['FTA'] - sum['FTM']
-            total_stl = sum['STL']
-            total_tov = sum['TOV']
+                sum = stats.sum()
+                total_pts = sum['PTS']
+                total_ast = sum['AST']
+                total_blk = sum['BLK']
+                total_fgm = sum['FGM']
+                total_fgmiss = sum['FGA'] - sum['FGM']
+                total_fg3m = sum['FG3M']
+                total_fg3miss = sum['FG3A'] - sum['FG3M']
+                total_reb = sum['REB']
+                total_pf = sum['PF']
+                total_ftm = sum['FTM']
+                total_ftmiss = sum['FTA'] - sum['FTM']
+                total_stl = sum['STL']
+                total_tov = sum['TOV']
 
-            total_score = 1 * total_pts \
-                          + 1.25 * total_reb \
-                          + 1.5 * total_ast + \
-                          3 * total_stl + \
-                          3 * total_blk + \
-                          1 * total_fg3m - \
-                          1 * total_tov - \
-                          0.5 * (total_fgmiss + total_ftmiss) \
-                          + 5 * (double_double - triple_double) \
-                          + 20 * triple_double + \
-                          0.5 * game_win
-            avg_score = total_score / game_played
-        else:
-            avg_score = 0.0
+                total_score = 1 * total_pts \
+                              + 1.25 * total_reb \
+                              + 1.5 * total_ast + \
+                              3 * total_stl + \
+                              3 * total_blk + \
+                              1 * total_fg3m - \
+                              1 * total_tov - \
+                              0.5 * (total_fgmiss + total_ftmiss) \
+                              + 5 * (double_double - triple_double) \
+                              + 20 * triple_double
+                avg_score = total_score / game_played
+            else:
+                avg_score = 0.0
+                total_score = 0.0
 
-        line = pd.DataFrame({'name' : [name], 'score' : [avg_score]})
-        ranking = ranking.append(line, ignore_index=True)
-
-        pbar.update(index)
+            line = pd.DataFrame({'id' : [person], \
+                                 'name' : [name], \
+                                 'total' : [total_score], \
+                                 'games' : [game_played], \
+                                 'avg' : [avg_score]})
+            ranking = ranking.append(line, ignore_index=True)
+            
+            pbar.update(index)
         
-    pbar.finish()
-    return ranking
-    
-def main():
+        pbar.finish()
+        return ranking
 
+def main():
     parser = argparse.ArgumentParser(description = 'Fantasy Player Analytics')
     parser.add_argument('season', metavar='SEASON', \
                         type=int, nargs='+', help='season to analyse')
@@ -107,26 +168,19 @@ def main():
                         choices=[10,25,50], default=10, help='number of results to display')
     args = parser.parse_args()
     
-    season = args.season
+    season_list = args.season
     show = int(args.display)
     cache = ".cache"
+    default_season = '2015'
     
-    for s in season:
-        if s < 2000 or s > 2015:
-            print 'Invalid season!'
-            exit(1)
-            
-        print 'Analyzing season ', s
-        s = str(s)
-        season_cache = os.path.join(cache, s)
-        if not os.path.exists(season_cache):
-            os.makedirs(season_cache)
+    analyzer = Analyzer(cache, default_season)
+    ranking = analyzer.analyse(seasons=season_list)
 
-        ranking = analyse(season=s, cache=season_cache)
-        
-        
-    print ranking.sort_values(by=['score'], ascending=[False]).head(show)
-    ranking.to_csv('res.csv')
+    print ranking['avg']
+    # print query results to standard output
+    # print ranking.sort_values(by=['avg'], ascending=[False]).head(show)
+    # cache query results
+    ranking['avg'].to_csv(os.path.join(cache, 'res.csv'))
     
 if __name__ == "__main__":
     main()
