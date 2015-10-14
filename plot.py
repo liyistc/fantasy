@@ -6,26 +6,16 @@ pd.set_option('display.width', 100)
 import argparse
 
 def plot(stats, players):
-  #print stats
-  fig, ax = plt.subplots()
+  trans = stats.set_index(['id','name']).T
 
-  #player_mask = {'id' : [201566]}
-  #row_mask = stats.isin(player_mask).all(1)
-  #print stats[row_mask]
-
-  names = []
+  tuples = []
   for player in players:
+    p_name = stats['name'][stats.id == player].values[0]
+    tuples.append((player, p_name))
 
-    column = stats[['avg_2010', \
-                    'avg_2011', \
-                    'avg_2012', \
-                    'avg_2013', \
-                    'avg_2014']][(stats.id == player)].transpose()
-    
-    ax = column.plot(ax=ax, kind='line', use_index=False)
-    names.append(stats[stats.id == player]['name'])
+  index = pd.MultiIndex.from_tuples(tuples, names=['id','name'])
+  trans[index].plot(kind='line', use_index=False)
 
-  ax.legend(names)
   plt.show()
 
 def main():
