@@ -180,7 +180,7 @@ def main():
     # print query results to standard output
     # print ranking.sort_values(by=['avg'], ascending=[False]).head(show)
     # cache query results
-    ranking['avg'].to_csv(os.path.join(cache, 'res.csv'))
+    ranking['avg'].to_csv(os.path.join(cache, 'res.csv'), index=True)
     
 if __name__ == "__main__":
     main()
