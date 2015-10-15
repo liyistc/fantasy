@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 pd.set_option('display.width', 120)
+from pandas import ExcelWriter
 import argparse
 
 def plot(stats, players):
@@ -24,13 +25,17 @@ def main():
                       type=int, nargs='*', help='ids of players to display')
   parser.add_argument('-d', '--display', type=int, \
                       choices=[10,25,50], default=10, help='number of rows to display')
-  parser.add_argument('-n', '--number', type=int, \
-                      choices=[1,2,3,4,5,6,7], default=5, help='number of columns to display')
+  parser.add_argument('-e', '--excel', dest='excel', \
+                      action='store_true', default=False, help='to excel')
   args = parser.parse_args()
 
   show = int(args.display)
-  length = int(args.number)
   stats = pd.DataFrame.from_csv('.cache/res.csv')
+  
+  if (args.excel):
+    writer = ExcelWriter('.cache/res.xlsx')
+    stats.to_excel(writer, 'Sheet1')
+    writer.save()
   
   if len(args.players) > 0:
     plot(stats=stats, players=args.players)
