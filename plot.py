@@ -1,5 +1,8 @@
 #!/usr/bin/python
 
+# Author: Yi Li
+# Last modified: Oct 15, 2015
+
 import matplotlib.pyplot as plt
 import pandas as pd
 pd.set_option('display.width', 120)
@@ -7,8 +10,10 @@ from pandas import ExcelWriter
 import argparse
 
 def plot(stats, players):
+  # compute transpose of player stats table
   trans = stats.set_index(['id','name']).T
 
+  # collect selected player indices
   tuples = []
   for player in players:
     p_name = stats['name'][stats.id == player].values[0]
@@ -16,7 +21,8 @@ def plot(stats, players):
 
   index = pd.MultiIndex.from_tuples(tuples, names=['id','name'])
   trans[index].plot(kind='line', grid=True, use_index=True)
-
+  
+  # show graph
   plt.show()
 
 def main():
@@ -29,17 +35,20 @@ def main():
                       action='store_true', default=False, help='to excel')
   args = parser.parse_args()
 
-  show = int(args.display)
+  show = int(args.display) # number of stats to show
   stats = pd.DataFrame.from_csv('.cache/res.csv')
   
+  # write all stats to excel file
   if (args.excel):
     writer = ExcelWriter('.cache/res.xlsx')
     stats.to_excel(writer, 'Sheet1')
     writer.save()
   
+  # display plot
   if len(args.players) > 0:
     plot(stats=stats, players=args.players)
 
+  # print short summary
   print stats.sort_values(by=['avg_2014'], ascending=[False]).head(show)
   
 if __name__ == "__main__":
