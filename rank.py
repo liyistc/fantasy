@@ -2,11 +2,11 @@
 
 # Fantasy Basketball Analytics
 # Author Yi Li
-# Last modified: Oct 13, 2015
+# Last modified: Oct 18, 2015
 
 
 from goldsberry import *
-from goldsberry.player import game_logs
+from goldsberry.player import demographics, game_logs
 import pandas as pd
 from progressbar import ProgressBar, Bar, ETA, Percentage, RotatingMarker
 import os
@@ -17,22 +17,24 @@ class Analyzer:
 
     def __init__(self, cache, default_season):
         self.cache = cache
-        self.default_cache = os.path.join(cache, default_season)
+        self.default_cache = os.path.join(cache, 'default')
         self.default_season = default_season
         if not os.path.exists(self.default_cache):
             os.makedirs(self.default_cache)
 
     def merge_table_on_id_name(self, table_list, seasons, column):
         i = 0
-        merge = table_list[i][['id','name',column]]
+        merge = table_list[i][['id','name','team',column]]
         # rename column avg to avg_<season>
         merge = merge.rename(columns = {column : column+'_'+str(seasons[i])})
         
         for r in table_list[1:]:
             i = i + 1
-            margin = r[['id','name',column]].rename(columns = {column : column+'_'+str(seasons[i])})
+            margin = r[['id','name','team',column]].\
+                     rename(columns = \
+                            {column : column+'_'+str(seasons[i])})
             merge = pd.merge(merge, margin, \
-                             on=['id','name'])
+                             on=['id','name','team'])
         return merge
 
     def analyse(self, seasons):
@@ -69,6 +71,18 @@ class Analyzer:
         return merged_ranking
         
 
+    def get_player_info(self, pid):
+        player_info_cache = os.path.join(self.default_cache, str(pid) + '.csv')
+        if not os.path.exists(player_info_cache):
+            info = pd.DataFrame(demographics(pid).player_info())
+            info.to_csv(player_info_cache)
+        else:
+            info = pd.DataFrame.from_csv(player_info_cache)
+            
+        team = info['TEAM_ABBREVIATION'].values[0]
+        from_year = info['FROM_YEAR'].values[0]
+        to_year = info['TO_YEAR'].values[0]
+        return (team, from_year, to_year)
 
     def analyse_season(self, players, season, cache):
         ranking = pd.DataFrame(columns=('id', 'name','total','games','avg'))
@@ -78,9 +92,10 @@ class Analyzer:
     
         for index, row in players.iterrows():
             name = row['DISPLAY_LAST_COMMA_FIRST']
-            person = row['PERSON_ID']        
+            person = row['PERSON_ID']
             playerlog = str(person) + '.csv'
             player_cache = os.path.join(cache, playerlog)
+            team = row['TEAM_ABBREVIATION']
 
             if not os.path.exists(player_cache):
                 stats = pd.DataFrame(game_logs(playerid=person, season=season).logs())
@@ -150,6 +165,7 @@ class Analyzer:
 
             line = pd.DataFrame({'id' : [person], \
                                  'name' : [name], \
+                                 'team' : [team], \
                                  'total' : [total_score], \
                                  'games' : [game_played], \
                                  'avg' : [avg_score]})
@@ -180,7 +196,9 @@ def main():
     # print query results to standard output
     # print ranking.sort_values(by=['avg'], ascending=[False]).head(show)
     # cache query results
-    ranking['avg'].to_csv(os.path.join(cache, 'res.csv'), index=True)
+    ranking['avg'].to_csv(os.path.join(cache, 'res_avg.csv'), index=True)
+    ranking['total'].to_csv(os.path.join(cache, 'res_total.csv'), index=True)
+    ranking['games'].to_csv(os.path.join(cache, 'res_games.csv'), index=True)
     
 if __name__ == "__main__":
     main()
