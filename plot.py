@@ -50,7 +50,7 @@ def main():
     plot(stats=stats, players=args.players)
 
   # print short summary
-  print stats.sort_values(by=['avg_2014'], ascending=[False]).head(show)
+  print stats.sort_values(by=['avg_2015'], ascending=[False]).head(show)
   
 if __name__ == "__main__":
   main()

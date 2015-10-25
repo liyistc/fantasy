@@ -12,7 +12,6 @@ from progressbar import ProgressBar, Bar, ETA, Percentage, RotatingMarker
 import os
 import argparse
 
-
 class Analyzer:
 
     def __init__(self, cache, default_season):
@@ -45,8 +44,8 @@ class Analyzer:
             if s < 2000 or s > 2015:
                 print 'Invalid season!'
                 exit(1)
-            
-            print 'Analyzing season ', s
+            # only compute pre-season data for 2015
+            t = 4 if s == 2015 else 1
             s = str(s)
             season_cache = os.path.join(self.cache, s)
             
@@ -60,8 +59,9 @@ class Analyzer:
                 p_2015.to_csv(players_cache)
             else:
                 p_2015 = pd.DataFrame.from_csv(players_cache)
-
-            season_ranking = self.analyse_season(players=p_2015, season=s, cache=season_cache)
+            
+            season_ranking = self.analyse_season(players=p_2015, season=s, \
+                                                 seasontype=t, cache=season_cache)
             rank_list.append(season_ranking)
 
         merged_ranking['avg'] = self.merge_table_on_id_name(rank_list, seasons, 'avg')
@@ -84,21 +84,24 @@ class Analyzer:
         to_year = info['TO_YEAR'].values[0]
         return (team, from_year, to_year)
 
-    def analyse_season(self, players, season, cache):
-        ranking = pd.DataFrame(columns=('id', 'name','total','games','avg'))
+    def analyse_season(self, players, season, seasontype, cache):
 
+        ranking = pd.DataFrame(columns=('id', 'name','total','games','avg'))
+        print 'Analyzing season ' + season + ' type ' + str(seasontype)
+        
         widgets = ['Analyzing: ', Percentage(), ' ', Bar(marker=RotatingMarker()), ' ', ETA()]
         pbar = ProgressBar(widgets=widgets, maxval=len(players.index)).start()
     
         for index, row in players.iterrows():
             name = row['DISPLAY_LAST_COMMA_FIRST']
             person = row['PERSON_ID']
-            playerlog = str(person) + '.csv'
+            playerlog = str(person) + '_' + str(seasontype) + '.csv'
             player_cache = os.path.join(cache, playerlog)
             team = row['TEAM_ABBREVIATION']
 
             if not os.path.exists(player_cache):
-                stats = pd.DataFrame(game_logs(playerid=person, season=season).logs())
+                stats = pd.DataFrame(game_logs(playerid=person, season=season, \
+                                               seasontype=seasontype).logs())
                 stats.to_csv(player_cache)
             else:
                 stats = pd.DataFrame.from_csv(player_cache)
