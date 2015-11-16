@@ -45,7 +45,7 @@ class Analyzer:
                 print 'Invalid season!'
                 exit(1)
             # only compute pre-season data for 2015
-            t = 4 if s == 2015 else 1
+            t = 1 if s == 2015 else 1
             s = str(s)
             season_cache = os.path.join(self.cache, s)
             
